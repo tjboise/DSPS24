@@ -7,7 +7,9 @@ Team Members: Tianjie Zhang, Alex Smith
 
 Please download the data first.
 
+### results
 
+please write results in the [google excel](https://docs.google.com/spreadsheets/d/1Ij8w8vqAo-dUPt97YgrExTam9bNOdL69jmSlJbwLJoI/edit#gid=0)
 
 
 
