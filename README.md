@@ -11,7 +11,11 @@ Please download the data first.
 
 please write results in the [google excel](https://docs.google.com/spreadsheets/d/1Ij8w8vqAo-dUPt97YgrExTam9bNOdL69jmSlJbwLJoI/edit#gid=0)
 
-![image](https://github.com/tjboise/DSPS24/assets/95270677/3b58ce95-910d-42cc-bd54-3d417c066e67)
+train set: ![image](https://github.com/tjboise/DSPS24/assets/95270677/3b58ce95-910d-42cc-bd54-3d417c066e67) 
+
+Test set:
+![image](https://github.com/tjboise/DSPS24/assets/95270677/cbbb506c-9f72-4f96-bb70-053e94ae3490)
+
 
 
 
