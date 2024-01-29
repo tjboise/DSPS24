@@ -8,7 +8,7 @@ import json
 # df: should have two columns - image_name and PCI
 def gen_submit(df):
     out_json = []
-    for idx, results in df.iterrows():
+    for _, results in df.iterrows():
         out_json.append({results['image_name']: results['PCI']})
     with open('submission.json', 'w') as f:
         json.dump(out_json, f)
