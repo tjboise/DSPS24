@@ -1,3 +1,4 @@
+import math
 import torch
 import pandas as pd
 from torchvision import models, transforms
@@ -32,7 +33,7 @@ def load_image(image_path):
 
 
 class CachedDataset(Dataset):
-    def __init__(self, datasets, image_paths, pci_values, transform=None):
+    def __init__(self, datasets, image_paths, pci_values, transform=None, num_buckets=10):
         # Convert to list if they are Pandas Series
         image_paths = [
             "../../data/" + datasets + "/" + path for path in image_paths.tolist()
@@ -42,12 +43,34 @@ class CachedDataset(Dataset):
         for path in tqdm(image_paths, desc="Loading images"):
             try:
                 self.images.append(load_image(path))
-            except:
+            except IOError:
                 print(f"Error loading image: {path}")
                 badpaths.append(path)
         
         self.pci_values = pci_values.tolist()
         self.transform = transform
+        
+        bucket_occourcences = [0] * num_buckets
+        for pci in self.pci_values:
+            bucket = int((pci * num_buckets) - 1)
+            bucket_occourcences[bucket] += 1
+        print(bucket_occourcences)
+            
+        self.bucket_scale = [0] * num_buckets
+        for i in range(num_buckets):
+            self.bucket_scale[i] = int(math.sqrt(max(bucket_occourcences) / bucket_occourcences[i]))
+        print(self.bucket_scale)
+            
+        new_images = []
+        new_pci_values = []
+        for i in range(len(self.images)):
+            bucket = int((self.pci_values[i] * num_buckets) - 1)
+            for _ in range(self.bucket_scale[bucket]):
+                new_images.append(self.images[i])
+                new_pci_values.append(self.pci_values[i])
+        
+        self.images = new_images
+        self.pci_values = new_pci_values
 
     def __len__(self):
         return len(self.images)
@@ -95,7 +118,7 @@ test_dataset = CachedDataset(
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
 
-model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 model.fc = nn.Sequential(
     nn.Dropout(0.5), nn.Linear(model.fc.in_features, 1), nn.Sigmoid()  # Add dropout
 )
@@ -107,7 +130,7 @@ model = model.to(device)
 #     return torch.mean(torch.abs((target - output) / target)) * 100
 
 loss_function = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
