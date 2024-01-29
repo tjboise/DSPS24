@@ -25,13 +25,11 @@ model.eval()
 
 # Step 2: Create a dataset for test images
 test_images_folder = '../../data/test'  # Replace with your folder path
-test_images = os.listdir(test_images_folder)
+# test_images = os.listdir(test_images_folder)
 
 # Define transforms (should be the same as used during training, without augmentation)
 test_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 def load_image(image_path):
@@ -39,6 +37,10 @@ def load_image(image_path):
         image = Image.open(f)
         image = image.convert('RGB')
     return image
+
+data = pd.read_csv('../../data/test.csv')
+target = data['PCI'].values
+test_images = data['image_name'].values
 
 # Step 3: Run inference
 results = []
@@ -53,7 +55,9 @@ for img_name in tqdm(test_images):
 
     results.append({'image_name': img_name, 'PCI': predicted_pci})
 
-# Step 4: Create DataFrame
+
+def mape_loss(output, target):
+    return torch.mean(torch.abs((target - output) / target)) * 100
 
 
 def gen_submit(df):
@@ -66,9 +70,11 @@ def gen_submit(df):
 
 df = pd.DataFrame(results)
 df["PCI"] *= 100  # denormalize the PCI value
-print(df)
 
-# df.to_csv(folder_path+'/'+'pci.csv', index=False)
+print(f'MAPE loss: {mape_loss(torch.tensor(df["PCI"].values), torch.tensor(target))}')
+# for testing, write a dataframe with the expected and actialy PCI values
+testing = pd.DataFrame({'Target': target, 'Predicted': df['PCI'].values})
+testing.to_csv('testing.csv', index=False)
 
-# # Step 5: Generate submission file
+
 gen_submit(df)

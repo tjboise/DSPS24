@@ -71,16 +71,14 @@ test_data["PCI"] /= 100
 train_transform = transforms.Compose(
     [
         transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
+        transforms.RandomRotation(90),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
 
 test_transform = transforms.Compose(
     [
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
 
@@ -94,13 +92,14 @@ test_dataset = CachedDataset(
 
 
 # Data loaders
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
 
 model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
 model.fc = nn.Sequential(
     nn.Dropout(0.5), nn.Linear(model.fc.in_features, 1), nn.Sigmoid()  # Add dropout
 )
+
 model = model.to(device)
 
 
@@ -110,7 +109,7 @@ model = model.to(device)
 loss_function = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
 # Training Loop
 # Training Loop with Early Stopping
