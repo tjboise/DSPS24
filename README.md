@@ -16,7 +16,7 @@ please write results in the [google excel](https://docs.google.com/spreadsheets/
 1. Train on a pre-trained model: for example, train on resnet 50 first and get the parameters. then, train again based on the parameters.
 2. Log-norm transfermation: it is good for paying more attention on the small PCI value.
 3. Augmentation images and PCI based on the PCI value. for example, a small PCI image would be augmented more than a high PCI image.
-4. 
+4. use weighted loss function to update parameters. but it seems not work.
 
 
 
