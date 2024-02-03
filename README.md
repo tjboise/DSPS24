@@ -11,11 +11,12 @@ Please download the data first.
 
 please write results in the [google excel](https://docs.google.com/spreadsheets/d/1Ij8w8vqAo-dUPt97YgrExTam9bNOdL69jmSlJbwLJoI/edit#gid=0)
 
-train set: ![image](https://github.com/tjboise/DSPS24/assets/95270677/3b58ce95-910d-42cc-bd54-3d417c066e67) 
+### some strategy
 
-Test set:
-![image](https://github.com/tjboise/DSPS24/assets/95270677/cbbb506c-9f72-4f96-bb70-053e94ae3490)
-
+1. Train on a pre-trained model: for example, train on resnet 50 first and get the parameters. then, train again based on the parameters.
+2. Log-norm transfermation: it is good for paying more attention on the small PCI value.
+3. Augmentation images and PCI based on the PCI value. for example, a small PCI image would be augmented more than a high PCI image.
+4. 
 
 
 
