@@ -24,7 +24,7 @@ model = model.to(device)
 model.eval()
 
 # Step 2: Create a dataset for test images
-test_images_folder = '../../data/test'  # Replace with your folder path
+test_images_folder = '../../data/test' 
 # test_images = os.listdir(test_images_folder)
 
 # Define transforms (should be the same as used during training, without augmentation)
@@ -63,6 +63,8 @@ def mape_loss(output, target):
 def gen_submit(df):
     out_json = []
     for _, results in df.iterrows():
+        if results['PCI'] < 30:
+            continue
         out_json.append({results['image_name']: results['PCI']})
     with open('submission.json', 'w') as f:
         json.dump(out_json, f)

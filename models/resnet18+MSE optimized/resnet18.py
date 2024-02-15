@@ -33,7 +33,9 @@ def load_image(image_path):
 
 
 class CachedDataset(Dataset):
-    def __init__(self, datasets, image_paths, pci_values, transform=None, num_buckets=10):
+    def __init__(self, datasets, image_paths, pci_values, transform=None, num_buckets=10, do_bucketing=False, max_bucket=None):
+        if max_bucket is None:
+            max_bucket = num_buckets
         # Convert to list if they are Pandas Series
         image_paths = [
             "../../data/" + datasets + "/" + path for path in image_paths.tolist()
@@ -50,27 +52,30 @@ class CachedDataset(Dataset):
         self.pci_values = pci_values.tolist()
         self.transform = transform
         
-        bucket_occourcences = [0] * num_buckets
-        for pci in self.pci_values:
-            bucket = int((pci * num_buckets) - 1)
-            bucket_occourcences[bucket] += 1
-        print(bucket_occourcences)
+        if do_bucketing:
+            bucket_occourcences = [0] * num_buckets
+            for pci in self.pci_values:
+                bucket = int((pci * num_buckets) - 1)
+                bucket_occourcences[bucket] += 1
+            print(bucket_occourcences)
+                
+            self.bucket_scale = [0] * num_buckets
+            for i in range(num_buckets):
+                self.bucket_scale[i] = int(math.sqrt(max(bucket_occourcences) / bucket_occourcences[i]))
+            print(self.bucket_scale)
+                
+            new_images = []
+            new_pci_values = []
+            for i in range(len(self.images)):
+                bucket = int((self.pci_values[i] * num_buckets) - 1)
+                # if bucket < max_bucket:
+                #     continue
+                for _ in range(self.bucket_scale[bucket]):
+                    new_images.append(self.images[i])
+                    new_pci_values.append(self.pci_values[i])
             
-        self.bucket_scale = [0] * num_buckets
-        for i in range(num_buckets):
-            self.bucket_scale[i] = int(math.sqrt(max(bucket_occourcences) / bucket_occourcences[i]))
-        print(self.bucket_scale)
-            
-        new_images = []
-        new_pci_values = []
-        for i in range(len(self.images)):
-            bucket = int((self.pci_values[i] * num_buckets) - 1)
-            for _ in range(self.bucket_scale[bucket]):
-                new_images.append(self.images[i])
-                new_pci_values.append(self.pci_values[i])
-        
-        self.images = new_images
-        self.pci_values = new_pci_values
+            self.images = new_images
+            self.pci_values = new_pci_values
 
     def __len__(self):
         return len(self.images)
@@ -85,7 +90,7 @@ class CachedDataset(Dataset):
 
 # Load your data
 train_data = pd.read_csv("../../data/train.csv")      
-train_data["PCI"] /= 100  # normalize the PCI value
+train_data["pci"] /= 100  # normalize the PCI value
     
 test_data = pd.read_csv("../../data/test.csv")
 test_data["PCI"] /= 100
@@ -105,20 +110,7 @@ test_transform = transforms.Compose(
     ]
 )
 
-# Create datasets
-train_dataset = CachedDataset(
-    "train", train_data["image_name"], train_data["PCI"], train_transform
-)
-test_dataset = CachedDataset(
-    "test", test_data["image_name"], test_data["PCI"], test_transform
-)
-
-
-# Data loaders
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
-
-model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+model = models.resnet18(models.ResNet18_Weights.IMAGENET1K_V1)
 model.fc = nn.Sequential(
     nn.Dropout(0.5), nn.Linear(model.fc.in_features, 1), nn.Sigmoid()  # Add dropout
 )
@@ -130,9 +122,6 @@ model = model.to(device)
 #     return torch.mean(torch.abs((target - output) / target)) * 100
 
 loss_function = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
-
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
 # Training Loop
 # Training Loop with Early Stopping
@@ -147,61 +136,79 @@ trigger_times = 0
 
 best_model = None
 
-for epoch in range(your_num_epochs):
-    model.train()
-    train_loss = 0.0
-    num_losses = 0
-    train_bar = tqdm(train_loader, desc=f"Training Epoch {epoch+1}/{your_num_epochs}")
-    for inputs, labels in train_bar:
-        inputs, labels = inputs.to(device), labels.to(device)  # Transfer to GPU
-
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        labels = labels.float().unsqueeze(1)
-        loss = loss_function(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()
-        num_losses += 1
-        train_bar.set_postfix(loss=train_loss / num_losses)
-
-    val_loss = 0.0
-    num_losses = 0
-    val_bar = tqdm(test_loader, desc=f"Validation Epoch {epoch+1}/{your_num_epochs}")
-    with torch.no_grad():
-        for inputs, labels in val_bar:
+i=3
+train_dataset = CachedDataset(
+    "train", train_data["image_name"], train_data["pci"], train_transform, do_bucketing=True, max_bucket=i
+)
+test_dataset = CachedDataset(
+    "test", test_data["image_name"], test_data["PCI"], test_transform, do_bucketing=True, max_bucket=i
+)
+# Data loaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+trigger_times = 0
+print(f"Training with {i} buckets")
+def train(train_loader, test_loader, model):
+    global best_val_loss, trigger_times, best_model
+    for epoch in range(your_num_epochs):
+        model.train()
+        train_loss = 0.0
+        num_losses = 0
+        train_bar = tqdm(train_loader, desc=f"Training Epoch {epoch+1}/{your_num_epochs}")
+        for inputs, labels in train_bar:
             inputs, labels = inputs.to(device), labels.to(device)  # Transfer to GPU
 
+            optimizer.zero_grad()
             outputs = model(inputs)
             labels = labels.float().unsqueeze(1)
             loss = loss_function(outputs, labels)
-            val_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
             num_losses += 1
-            val_bar.set_postfix(loss=val_loss / num_losses)
-    
-    scheduler.step()
-    current_lr = optimizer.param_groups[0]["lr"]
-    print(f"Epoch {epoch + 1}/{your_num_epochs}, Current Learning Rate: {current_lr}")
-    train_loss /= len(train_loader)
-    train_losses.append(train_loss)
+            train_bar.set_postfix(loss=train_loss / num_losses)
 
-    model.eval()
+        val_loss = 0.0
+        num_losses = 0
+        val_bar = tqdm(test_loader, desc=f"Validation Epoch {epoch+1}/{your_num_epochs}")
+        with torch.no_grad():
+            for inputs, labels in val_bar:
+                inputs, labels = inputs.to(device), labels.to(device)  # Transfer to GPU
+
+                outputs = model(inputs)
+                labels = labels.float().unsqueeze(1)
+                loss = loss_function(outputs, labels)
+                val_loss += loss.item()
+                num_losses += 1
+                val_bar.set_postfix(loss=val_loss / num_losses)
+        
+        scheduler.step()
+        current_lr = optimizer.param_groups[0]["lr"]
+        print(f"Epoch {epoch + 1}/{your_num_epochs}, Current Learning Rate: {current_lr}")
+        train_loss /= len(train_loader)
+        train_losses.append(train_loss)
+
+        model.eval()
 
 
-    val_loss /= len(test_loader)
-    val_losses.append(val_loss)
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        best_model = copy.deepcopy(model)
-        # best_model_params = copy.deepcopy(model.state_dict())  # Update the best model
-        trigger_times = 0
-    else:
-        trigger_times += 1
-        if trigger_times >= patience:
-            print("Early stopping!")
-            break
+        val_loss /= len(test_loader)
+        val_losses.append(val_loss)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model = copy.deepcopy(model)
+            # best_model_params = copy.deepcopy(model.state_dict())  # Update the best model
+            trigger_times = 0
+        else:
+            trigger_times += 1
+            if trigger_times >= patience:
+                print("Early stopping!")
+                break
 
 
+
+train(train_loader, test_loader, model)
 losses = pd.DataFrame({"Train-loss": train_losses, "Val-loss": val_losses})
 
 # Save DataFrame to CSV
