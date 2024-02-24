@@ -85,22 +85,22 @@ val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
 
 # Model definition
-model = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1)
-model.fc = nn.Sequential(
-    # nn.Dropout(0.5),  # Add dropout
-    nn.Linear(model.fc.in_features, 1),
-    nn.Sigmoid()
-)
-model = model.to(device)
-
-# # Use EfficientNet-B0
-# model = models.efficientnet_b0(pretrained=True)  # Ensure you have the correct pretrained argument
-# # Replace the classifier layer with your own custom layer
-# model.classifier[1] = nn.Sequential(
-#     nn.Linear(model.classifier[1].in_features, 1),
+# model = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1)
+# model.fc = nn.Sequential(
+#     # nn.Dropout(0.5),  # Add dropout
+#     nn.Linear(model.fc.in_features, 1),
 #     nn.Sigmoid()
 # )
 # model = model.to(device)
+
+# Use EfficientNet-B0
+model = models.efficientnet_b0(pretrained=True)  # Ensure you have the correct pretrained argument
+# Replace the classifier layer with your own custom layer
+model.classifier[1] = nn.Sequential(
+    nn.Linear(model.classifier[1].in_features, 1),
+    nn.Sigmoid()
+)
+model = model.to(device)
 
 
 # Loss and optimizer
